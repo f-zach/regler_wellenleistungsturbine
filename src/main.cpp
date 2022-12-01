@@ -24,7 +24,7 @@ int pwmValve = 0;
 
 bool controllerOnSwitch, controllerOnSwitchLast, valueRecieved, valueConfirmed, valueDeclined;
 
-int valvePin = 21, ecuPin = 37;
+int valvePin = 21, ecuPin = 37, turbineOnPin = 29;
 int throttleLeverPin = A12, brakeLeverPin = A13;
 int maxThrottleValue = 0, minThrottleValue = 9999, maxBrakeValue = 0, minBrakeValue = 9999;
 
@@ -52,7 +52,10 @@ void setup()
 
   digitalWrite(13, LOW);
 
+  // Set pwm frequency of the brake valve
   analogWriteFrequency(valvePin, 800);
+
+  // Increase read and write resolution ofh the analog and pwm pins
   analogWriteResolution(12);
   analogReadResolution(12);
 
@@ -160,11 +163,14 @@ void loop()
     mode = 0;
   }
 
+
   controllerOnSwitchLast = controllerOnSwitch;
 
+// Read analog values of throttle and brake lever
   potBrake = brakeAvg.reading(analogRead(A13));
   potThrottle = throttleAvg.reading(analogRead(A12));
 
+// Check if throttle lever is in the deadzone
   if (potThrottle < (minThrottleValue + 30))
   {
     throttleSetting = 0.0;
@@ -175,9 +181,11 @@ void loop()
   }
   else
   {
+    // Calculate the throttle setting
     throttleSetting = (float(potThrottle) - minThrottleValue - 30) / (maxThrottleValue - minThrottleValue - 60);
   }
 
+// Check if brake lever is in the deadzone
   if (potBrake < (minBrakeValue + 30))
   {
     brakeSetting = 0.0;
@@ -188,17 +196,21 @@ void loop()
   }
   else
   {
+    //Calculate the brake setting
     brakeSetting = (float(potBrake) - minBrakeValue - 30) / (maxBrakeValue - minBrakeValue - 60);
   }
-
+  // If turbine switch is on write the servo signal to be sent to the ecu
   if(digitalRead(29))
   {
     ecuOut.writeMicroseconds(995 + 115 + int(throttleSetting * 885));
   }
   else if(!digitalRead(29))
   {
+    // If the turbine switch is on, always send this value
     ecuOut.writeMicroseconds(995);
   }
+
+  // Apply the brake valve setting to the PWM signal
   analogWrite(valvePin, int(brakeSetting * 4096));
 
   switch (mode)
@@ -232,6 +244,7 @@ void loop()
     break;
   }
 
+  //Send the data to be displayed to the console
   if (millis() - tStart >= 100)
   {
     dataTransmission = "";
@@ -252,6 +265,8 @@ void loop()
   //Serial.println(digitalRead(29));
 }
 
+
+// On startup this function is used to calibrate the throttle and brake lever
 void learnLeverSettings()
 {
   int reading = 0;
